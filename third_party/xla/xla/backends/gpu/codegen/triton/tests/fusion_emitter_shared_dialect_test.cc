@@ -39,15 +39,23 @@ namespace {
 // *****************************************************************************
 
 class XTileDialectTest : public HloHardwareIndependentTestBase,
-                         public XTileTestBase {};
+                         public XTileTestBase {
+ protected:
+  DebugOptions GetDebugOptionsForTest() const override {
+    DebugOptions debug_options =
+        HloHardwareIndependentTestBase::GetDebugOptionsForTest();
+    // We want to test pure F32 behavior here, not the simulated BF16 precision.
+    debug_options.set_xla_gpu_default_to_alg_dot_bf16_bf16_f32(false);
+    return debug_options;
+  }
+};
 
 class XTileDialectTestParameterized
     : public XTileDialectTest,
       public ::testing::WithParamInterface<bool> {
  protected:
   DebugOptions GetDebugOptionsForTest() const override {
-    DebugOptions debug_options =
-        HloHardwareIndependentTestBase::GetDebugOptionsForTest();
+    DebugOptions debug_options = XTileDialectTest::GetDebugOptionsForTest();
     debug_options.set_xla_gpu_experimental_enable_tiling_propagation(
         GetParam());
     return debug_options;
@@ -519,6 +527,9 @@ TEST_F(XTileDialectTest, HloAllGatherDotLowering) {
   module->mutable_config()
       .mutable_debug_options()
       .set_xla_gpu_experimental_enable_tiling_propagation(true);
+  module->mutable_config()
+      .mutable_debug_options()
+      .set_xla_gpu_default_to_alg_dot_bf16_bf16_f32(false);
 
   BlockLevelParameters block_level_parameters;
   block_level_parameters.output_tile_sizes = {{128, 128}};
