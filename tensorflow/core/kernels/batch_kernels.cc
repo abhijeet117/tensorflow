@@ -28,6 +28,7 @@ limitations under the License.
 #include "absl/synchronization/notification.h"
 #include "xla/tsl/platform/criticality.h"
 #include "xla/tsl/platform/errors.h"
+#include "xla/tsl/platform/macros.h"
 #include "xla/tsl/platform/statusor.h"
 #include "tensorflow/core/common_runtime/device_mgr.h"
 #include "tensorflow/core/framework/device.h"
@@ -53,7 +54,6 @@ limitations under the License.
 #include "tensorflow/core/lib/random/random.h"
 #include "tensorflow/core/platform/errors.h"
 #include "tensorflow/core/platform/logging.h"
-#include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/numbers.h"
 #include "tensorflow/core/platform/status.h"
 #include "tensorflow/core/platform/threadpool.h"
@@ -74,10 +74,10 @@ constexpr int64_t kBatchThreadPoolSize = 128;
 }  // namespace
 
 // Per-model inflight batches parameters.
-const int64_t kMinInflightBatches = 1;
-const int64_t kInitialInflightBatches = 2;
-const int64_t kBatchesToAverageOver = 10;
-const int64_t kMaxInflightBatches = 64;
+TF_CONST_INIT const int64_t kMinInflightBatches = 1;
+TF_CONST_INIT const int64_t kInitialInflightBatches = 2;
+TF_CONST_INIT const int64_t kBatchesToAverageOver = 10;
+TF_CONST_INIT const int64_t kMaxInflightBatches = 64;
 
 void RecordBatchSplitUsage(
     std::optional<bool> maybe_enable_large_batch_splitting,

@@ -24,6 +24,7 @@ limitations under the License.
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
+#include "xla/tsl/platform/macros.h"
 #include "tensorflow/core/framework/allocation_description.pb.h"
 #include "tensorflow/core/framework/attr_value.pb.h"
 #include "tensorflow/core/framework/node_def.pb.h"
@@ -43,12 +44,12 @@ limitations under the License.
 namespace tensorflow {
 namespace grappler {
 
-const char kAttrInputSrc[] = "input_source_";
-const char kAttrSrcDevice[] = "send_device";
-const char kAttrDstDevice[] = "recv_device";
-const char kAttrTensorName[] = "tensor_name";
-const char kChannelDevice[] = "Channel";
-const char kStreaming[] = "_streaming";
+TF_CONST_INIT const char kAttrInputSrc[] = "input_source_";
+TF_CONST_INIT const char kAttrSrcDevice[] = "send_device";
+TF_CONST_INIT const char kAttrDstDevice[] = "recv_device";
+TF_CONST_INIT const char kAttrTensorName[] = "tensor_name";
+TF_CONST_INIT const char kChannelDevice[] = "Channel";
+TF_CONST_INIT const char kStreaming[] = "_streaming";
 
 namespace {
 
