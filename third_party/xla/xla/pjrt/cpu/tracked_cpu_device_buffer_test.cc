@@ -19,6 +19,7 @@ limitations under the License.
 #include <utility>
 #include <vector>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/base/casts.h"
 #include "absl/container/inlined_vector.h"
@@ -110,6 +111,92 @@ TEST(TrackedCpuDeviceBufferTest, BasicError) {
   ASSERT_TRUE(definition_event.IsError());
   EXPECT_EQ(definition_event.GetError().message(),
             "tracked_cpu_device_buffer_test error.");
+}
+
+TEST(TrackedCpuDeviceBufferTest, GetReadyFutureFastPathSuccess) {
+  ASSERT_OK_AND_ASSIGN(auto client, GetPjRtCpuClient(CpuClientOptions()));
+  PjRtMemorySpace* memory_space = client->memory_spaces()[0];
+  ASSERT_OK_AND_ASSIGN(auto buffer, CpuRawBuffer::Allocate(memory_space, 64));
+
+  auto definition_event = MakeConstructedAsyncValueRef<CpuEvent>();
+  definition_event.SetStateConcrete();
+
+  absl::InlinedVector<PjRtDeviceEventRef, 2> definition_events;
+  definition_events.push_back(PjRtDeviceEventRef(definition_event));
+
+  // event_tracking_enabled = false to trigger fast path.
+  AbstractTrackedDeviceBuffer tracked_buffer(
+      buffer, std::move(definition_events), /*event_tracking_enabled=*/false);
+
+  auto ready_future = tracked_buffer.GetReadyFuture(memory_space);
+  EXPECT_TRUE(ready_future.IsReady());
+  EXPECT_OK(ready_future.Await());
+}
+
+TEST(TrackedCpuDeviceBufferTest, GetReadyFutureFastPathError) {
+  ASSERT_OK_AND_ASSIGN(auto client, GetPjRtCpuClient(CpuClientOptions()));
+  PjRtMemorySpace* memory_space = client->memory_spaces()[0];
+  ASSERT_OK_AND_ASSIGN(auto buffer, CpuRawBuffer::Allocate(memory_space, 64));
+
+  auto definition_event = MakeConstructedAsyncValueRef<CpuEvent>();
+  definition_event.SetError(absl::InternalError("test fast path error"));
+
+  absl::InlinedVector<PjRtDeviceEventRef, 2> definition_events;
+  definition_events.push_back(PjRtDeviceEventRef(definition_event));
+
+  // event_tracking_enabled = false to trigger fast path.
+  AbstractTrackedDeviceBuffer tracked_buffer(
+      buffer, std::move(definition_events), /*event_tracking_enabled=*/false);
+
+  auto ready_future = tracked_buffer.GetReadyFuture(memory_space);
+  EXPECT_TRUE(ready_future.IsReady());
+  EXPECT_FALSE(ready_future.Await().ok());
+  EXPECT_EQ(ready_future.Await().message(), "test fast path error");
+}
+
+TEST(TrackedCpuDeviceBufferTest, GetReadyFutureFallbackPathSuccess) {
+  ASSERT_OK_AND_ASSIGN(auto client, GetPjRtCpuClient(CpuClientOptions()));
+  PjRtMemorySpace* memory_space = client->memory_spaces()[0];
+  ASSERT_OK_AND_ASSIGN(auto buffer, CpuRawBuffer::Allocate(memory_space, 64));
+
+  auto definition_event = MakeConstructedAsyncValueRef<CpuEvent>();
+
+  absl::InlinedVector<PjRtDeviceEventRef, 2> definition_events;
+  definition_events.push_back(PjRtDeviceEventRef(definition_event));
+
+  // event_tracking_enabled = true to trigger fallback path.
+  AbstractTrackedDeviceBuffer tracked_buffer(
+      buffer, std::move(definition_events), /*event_tracking_enabled=*/true);
+
+  auto ready_future = tracked_buffer.GetReadyFuture(memory_space);
+  EXPECT_FALSE(ready_future.IsReady());
+
+  definition_event.SetStateConcrete();
+
+  EXPECT_OK(ready_future.Await());
+}
+
+TEST(TrackedCpuDeviceBufferTest, GetReadyFutureFallbackPathError) {
+  ASSERT_OK_AND_ASSIGN(auto client, GetPjRtCpuClient(CpuClientOptions()));
+  PjRtMemorySpace* memory_space = client->memory_spaces()[0];
+  ASSERT_OK_AND_ASSIGN(auto buffer, CpuRawBuffer::Allocate(memory_space, 64));
+
+  auto definition_event = MakeConstructedAsyncValueRef<CpuEvent>();
+
+  absl::InlinedVector<PjRtDeviceEventRef, 2> definition_events;
+  definition_events.push_back(PjRtDeviceEventRef(definition_event));
+
+  // event_tracking_enabled = true to trigger fallback path.
+  AbstractTrackedDeviceBuffer tracked_buffer(
+      buffer, std::move(definition_events), /*event_tracking_enabled=*/true);
+
+  auto ready_future = tracked_buffer.GetReadyFuture(memory_space);
+  EXPECT_FALSE(ready_future.IsReady());
+
+  definition_event.SetError(absl::InternalError("test fallback path error"));
+
+  EXPECT_FALSE(ready_future.Await().ok());
+  EXPECT_EQ(ready_future.Await().message(), "test fallback path error");
 }
 
 TEST(TrackedCpuDeviceBufferTest, DelayedAllocation) {
