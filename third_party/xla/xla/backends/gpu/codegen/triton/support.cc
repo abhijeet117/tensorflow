@@ -56,9 +56,10 @@ CodegenDecision IsTritonSupportedDataType(
     case S16:
     case S32:
     case S64:
-    case F16:
-    case F32:
-    case F64:
+    case U8:
+    case U16:
+    case U32:
+    case U64:
       return CodegenDecision::Allow();
     case F8E5M2:
     case F8E4M3FN:
@@ -107,15 +108,12 @@ absl::flat_hash_set<HloOpcode> TritonSupportedUnaryElementwiseOps(
     return {};
   }
 
-  if (element_type == PrimitiveType::U16) {
-    return {HloOpcode::kAbs};
-  }
-
   absl::flat_hash_set<HloOpcode> ret{HloOpcode::kAbs, HloOpcode::kCopy};
 
   if (element_type != PrimitiveType::F8E5M2 &&
       element_type != PrimitiveType::F8E4M3FN &&
       element_type != PrimitiveType::F8E8M0FNU &&
+      !primitive_util::IsUnsignedIntegralType(element_type) &&
       !(gpu_version.IsRocm() && element_type == PrimitiveType::F8E5M2FNUZ) &&
       !(gpu_version.IsRocm() && element_type == PrimitiveType::F8E4M3FNUZ)) {
     ret.insert(HloOpcode::kNegate);
@@ -212,6 +210,12 @@ CodegenDecision IsTritonSupportedConversion(
     return error_message("Unsupported S4 output type.");
   }
 
+  // TODO(b/480995909): Remove this once JAX does not rely on convert from
+  // PRED to U8 not clamping the value to the [0, 1] range.
+  if (input == PRED && output == U8) {
+    return error_message("Unsupported PRED to U8 conversion.");
+  }
+
   if (!IsTritonSupportedDataType(input, gpu_version)) {
     return CodegenDecision::Forbid(
         absl::StrCat("Unsupported input type for conversion: ",
@@ -229,7 +233,7 @@ CodegenDecision IsTritonSupportedConversion(
 // Set of binary element-wise ops that are genuinely supported by Triton.
 absl::flat_hash_set<HloOpcode> TritonSupportedBinaryElementwiseOps(
     PrimitiveType element_type, const se::GpuComputeCapability& gpu_version) {
-  if (element_type == PrimitiveType::S4 || element_type == PrimitiveType::U16 ||
+  if (element_type == PrimitiveType::S4 ||
       element_type == PrimitiveType::F8E5M2 ||
       element_type == PrimitiveType::F8E4M3FN ||
       (gpu_version.IsRocm() && element_type == PrimitiveType::F8E5M2FNUZ) ||
@@ -279,7 +283,7 @@ absl::flat_hash_set<HloOpcode> TritonSupportedBinaryElementwiseOps(
 // Set of ternary elementwise ops that are genuinely supported by Triton.
 absl::flat_hash_set<HloOpcode> TritonSupportedTernaryElementwiseOps(
     PrimitiveType element_type, const se::GpuComputeCapability& gpu_version) {
-  if (element_type == PrimitiveType::S4 || element_type == PrimitiveType::U16) {
+  if (element_type == PrimitiveType::S4) {
     return {};
   }
 

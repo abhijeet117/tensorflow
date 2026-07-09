@@ -110,14 +110,15 @@ class LowerIotaToMakeRange : public mlir::OpRewritePattern<stablehlo::IotaOp> {
           op->getLoc(), "tt.make_range is only supported for integer types.");
     }
 
-    if (result_type.getElementType().isUnsignedInteger(32)) {
-      return rewriter.notifyMatchFailure(
-          op->getLoc(),
-          "lowering to tt.make_range is only supported for 32 bit signed "
-          "integers.");
-    }
-
     auto iota_end = result_type.getDimSize(0);
+    if (result_type.getElementType().isUnsignedInteger(32)) {
+      auto signless_type = result_type.clone(rewriter.getI32Type());
+      auto make_range = rewriter.create<ttir::MakeRangeOp>(
+          op.getLoc(), signless_type, /*start=*/0, iota_end);
+      rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
+          op, result_type, make_range.getResult());
+      return mlir::success();
+    }
 
     rewriter.replaceOpWithNewOp<ttir::MakeRangeOp>(op, result_type,
                                                    /*start=*/0, iota_end);

@@ -55,10 +55,22 @@ class LowerBitcast : public mlir::OpRewritePattern<tensor::BitcastOp> {
     mlir::Type triton_result_type =
         is_0d_result ? tensor_result_type.getElementType() : tensor_result_type;
 
-    auto bitcast = ttir::BitcastOp::create(rewriter, op.getLoc(),
-                                           triton_result_type, source);
-
-    mlir::Value result = bitcast.getResult();
+    mlir::Type src_elem_type = op.getSource().getType().getElementType();
+    mlir::Type dst_elem_type = tensor_result_type.getElementType();
+    mlir::Value result;
+    if (mlir::isa<mlir::IntegerType>(src_elem_type) &&
+        mlir::isa<mlir::IntegerType>(dst_elem_type) &&
+        src_elem_type.getIntOrFloatBitWidth() ==
+            dst_elem_type.getIntOrFloatBitWidth()) {
+      result = rewriter
+                   .create<mlir::UnrealizedConversionCastOp>(
+                       op.getLoc(), triton_result_type, source)
+                   .getResult(0);
+    } else {
+      auto bitcast = ttir::BitcastOp::create(rewriter, op.getLoc(),
+                                             triton_result_type, source);
+      result = bitcast.getResult();
+    }
     if (is_0d_result) {
       result = mlir::tensor::FromElementsOp::create(rewriter, op.getLoc(),
                                                     tensor_result_type, result);
